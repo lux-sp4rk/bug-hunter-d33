@@ -21,11 +21,17 @@
 
 ### Ritual of Three Passes
 
-Each hunt follows the ancient ways:
+Each hunt follows the ancient ways, powered by specialized skill modules in the `skills/` directory:
 
-1. **The Logic Hunt** — Trace every path. Find the edge case that breaks. Question every assumption.
-2. **The Security Hunt** — Follow the data. Where can it leak? Where can it be poisoned?
-3. **The Performance Hunt** — Measure the cost. Where does it scale poorly? What grows unbounded?
+1. **The Logic Hunt** (`skills/logic_hunt.sh`) — Trace every path. Find the edge case that breaks. Question every assumption.
+2. **The Security Hunt** (`skills/security_hunt.sh`) — Follow the data. Where can it leak? Where can it be poisoned?
+3. **The Performance Hunt** (`skills/performance_hunt.sh`) — Measure the cost. Where does it scale poorly? What grows unbounded?
+
+Each hunter masters their domain. The summoner (`scripts/summon.sh`) calls upon them as needed, with each skill operating as an independent module. This allows for:
+
+- **Per-skill model selection** — Use trinity-mini for logic, trinity-large for security
+- **Modular extension** — Add new hunters (style, documentation, accessibility) without touching the core
+- **Independent testing** — Each skill can be invoked and tested in isolation
 
 ### Voice
 

@@ -80,8 +80,9 @@ runs:
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
-        chmod +x "$ACTION_PATH/scripts/bug-hunter.sh"
-        "$ACTION_PATH/scripts/bug-hunter.sh"
+        chmod +x "$ACTION_PATH/scripts/summon.sh"
+        chmod +x "$ACTION_PATH/skills/"*.sh
+        "$ACTION_PATH/scripts/summon.sh"
 
     - name: Post Findings
       if: always()

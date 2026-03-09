@@ -58,18 +58,25 @@ integrations:
     api_key_env: ARCEE_API_KEY
 
 # Three-pass hunting configuration
+# Each pass is implemented as a modular skill in skills/
 passes:
   logic:
+    skill: skills/logic_hunt.sh
     prompt: prompts/logic-hunter.md
     priority: high
+    model: "${LOGIC_MODEL:-arcee/trinity-mini}"
   
   security:
+    skill: skills/security_hunt.sh
     prompt: prompts/security-hunter.md
     priority: critical
+    model: "${SECURITY_MODEL:-arcee/trinity-large}"
   
   performance:
+    skill: skills/performance_hunt.sh
     prompt: prompts/performance-hunter.md
     priority: medium
+    model: "${PERFORMANCE_MODEL:-arcee/trinity-mini}"
 
 # Summoning incantation (for human reference)
 summoning: |
