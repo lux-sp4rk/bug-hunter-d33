@@ -29,6 +29,10 @@ inputs:
     description: 'Path to custom prompt overrides'
     required: false
     default: ''
+  exclude-tests:
+    description: 'Exclude test files from review (true/false)'
+    required: false
+    default: 'true'
 
 outputs:
   status:
@@ -120,6 +124,7 @@ runs:
         PASSES: ${{ inputs.passes }}
         SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
         MAX_FILES: ${{ inputs.max-files }}
+        EXCLUDE_TESTS: ${{ inputs.exclude-tests }}
         GH_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         BASE_REF: ${{ github.base_ref }}

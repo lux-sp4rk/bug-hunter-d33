@@ -15,6 +15,7 @@ MAX_FILES="${MAX_FILES:-20}"
 PR_NUMBER="${PR_NUMBER:-}"
 BASE_REF="${BASE_REF:-main}"
 HEAD_SHA="${HEAD_SHA:-}"
+EXCLUDE_TESTS="${EXCLUDE_TESTS:-true}"
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,6 +55,24 @@ get_changed_files() {
 		files=$(git diff --name-only HEAD -- '*.py' '*.js' '*.ts' '*.jsx' '*.tsx' '*.go' '*.rs' '*.java' '*.rb' '*.php' 2>/dev/null || true)
 	fi
 
+	# Filter test files if enabled
+	if [ "$EXCLUDE_TESTS" = "true" ]; then
+		local filter_output
+		local filtered_files
+		local excluded_count
+
+		filter_output=$(filter_test_files "$files")
+		# Extract count from last line (stderr redirected to stdout in subshell)
+		excluded_count=$(echo "$filter_output" | tail -n 1)
+		# Get filtered files (all lines except last)
+		filtered_files=$(echo "$filter_output" | sed '$d')
+
+		if [ "$excluded_count" -gt 0 ] 2>/dev/null; then
+			log "Excluded $excluded_count test files (EXCLUDE_TESTS=true)"
+		fi
+		files="$filtered_files"
+	fi
+
 	if [ "$MAX_FILES" -gt 0 ]; then
 		echo "$files" | head -n "$MAX_FILES"
 	else
@@ -69,6 +88,51 @@ get_file_diff() {
 	else
 		git diff HEAD -- "$file" 2>/dev/null || cat "$file" 2>/dev/null || echo ""
 	fi
+}
+
+# Returns true (exit 0) if file should be excluded as a test file
+is_test_file() {
+	local file="$1"
+	local basename
+	basename=$(basename "$file")
+
+	# Check file name patterns
+	case "$basename" in
+	*.test.* | *.spec.*) return 0 ;;
+	test_*.py) return 0 ;;
+	*_test.py | *_test.go) return 0 ;;
+	*Test.java | Test*.java) return 0 ;;
+	*_spec.rb | *_test.rb) return 0 ;;
+	*Test.php | *Spec.php) return 0 ;;
+	esac
+
+	# Check directory patterns
+	case "$file" in
+	*/__tests__/* | */test/* | */tests/* | */spec/* | */specs/*)
+		return 0
+		;;
+	esac
+
+	return 1
+}
+
+# Filters test files from a list and returns count via stderr
+filter_test_files() {
+	local files="$1"
+	local excluded_count=0
+
+	while IFS= read -r file; do
+		[ -z "$file" ] && continue
+		if is_test_file "$file"; then
+			((excluded_count++))
+			log "  → Excluded test file: $file"
+		else
+			echo "$file"
+		fi
+	done <<<"$files"
+
+	# Return excluded count via stderr
+	echo "$excluded_count" >&2
 }
 
 # Run a specific skill

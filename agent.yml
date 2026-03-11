@@ -19,6 +19,8 @@ runtime:
   model: arcee/trinity-large  # Use larger model for deep hunts
   temperature: 0.1
   max_tokens: 8000
+  env:
+    EXCLUDE_TESTS: "true"  # Exclude test files by default
 
 # Task routing
 tasks:
