@@ -91,7 +91,12 @@ runs:
         # Detect Godot
         elif grep -qE '\.gd$|extends Node|@onready|func _ready' pr_diff.txt; then
           FRAMEWORK="godot"
-          FRAMEWORK_SKILL="godot-gdscript.md"
+          FRAMEWORK_SKILL="godot-gamedev.md"
+        # Detect Supabase/Postgres
+        elif grep -qE "from ['\"]@supabase/supabase-js['\"]|supabase\\.from\\(|supabase\\.rpc\\(" pr_diff.txt || \
+             grep -qE '\.sql$|CREATE TABLE|SELECT.*FROM' pr_diff.txt; then
+          FRAMEWORK="supabase"
+          FRAMEWORK_SKILL="supabase-postgres.md"
         fi
         
         echo "framework=$FRAMEWORK" >> "$GITHUB_OUTPUT"
@@ -127,6 +132,14 @@ runs:
         if [ -n "$FRAMEWORK" ] && [ -f ".bug-hunter/framework-skills/$FRAMEWORK_SKILL" ]; then
           export FRAMEWORK_CONTEXT=$(cat ".bug-hunter/framework-skills/$FRAMEWORK_SKILL")
           echo "📋 Framework context loaded (${#FRAMEWORK_CONTEXT} chars)"
+        fi
+        
+        # Export security context for security hunter
+        if echo "$PASSES" | grep -q "security"; then
+          if [ -f ".bug-hunter/framework-skills/security-review.md" ]; then
+            export SECURITY_CONTEXT=$(cat ".bug-hunter/framework-skills/security-review.md")
+            echo "🔒 Security context loaded (${#SECURITY_CONTEXT} chars)"
+          fi
         fi
         
         chmod +x "$ACTION_PATH/scripts/summon.sh"

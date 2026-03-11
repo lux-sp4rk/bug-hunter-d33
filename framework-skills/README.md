@@ -4,11 +4,12 @@ Pre-committed skills from skills.sh for zero-dependency CI runs.
 
 ## Available Skills
 
-| Framework | File | Source |
-|-----------|------|--------|
-| React/Next.js | `react-vercel.md` | vercel-labs/agent-skills |
-| Vue | `vue.md` | vuejs/agent-skills |
-| Godot/GDScript | `godot-gdscript.md` | godot/agent-skills |
+| Framework | File | Source | Detected By |
+|-----------|------|--------|-------------|
+| React/Next.js | `react-vercel.md` | vercel-labs/agent-skills | JSX/TSX, React imports |
+| Godot Development | `godot-gamedev.md` | zate/cc-godot | .gd files, @onready |
+| Supabase/Postgres | `supabase-postgres.md` | supabase/agent-skills | SQL files, Supabase imports |
+| Security Review | `security-review.md` | ghostsecurity/skills | Security-focused passes |
 
 ## Detection Mapping
 
@@ -20,24 +21,31 @@ Frameworks are auto-detected from the diff:
 - .jsx / .tsx extensions
 - from 'next/' imports
 
-# Vue
-- from 'vue'
-- .vue extensions
-
 # Godot
 - .gd extensions
 - @onready / extends Node
+
+# Supabase/Postgres
+- .sql files
+- from '@supabase/supabase-js'
+- supabase.rpc(), supabase.from()
+
+# Security (always available)
+- Applied during security hunter pass
 ```
 
-## Updating Skills
+## Adding New Skills
 
-To refresh a skill from skills.sh:
+To refresh or add a skill from skills.sh:
 
 ```bash
-npx skills fetch vercel-labs/agent-skills > framework-skills/react-vercel.md
-```
+# Fetch skill content
+npx skills fetch owner/skill-name > framework-skills/skill-name.md
 
-Then commit and push.
+# Update action.yml detection logic
+# Update this README
+# Commit and push
+```
 
 ## Why Local?
 
@@ -45,3 +53,12 @@ Then commit and push.
 - Deterministic reviews (skill version pinned)
 - Faster execution (no fetch latency)
 - Works on any runner (GitHub-hosted or self-hosted)
+
+## Skill Sources
+
+| Skill | Source | License |
+|-------|--------|---------|
+| React Best Practices | vercel-labs/agent-skills | MIT |
+| Godot Development | zate/cc-godot | MIT |
+| Supabase Postgres | supabase/agent-skills | Apache 2.0 |
+| Security Review | ghostsecurity/skills | Commercial |
