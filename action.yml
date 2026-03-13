@@ -10,9 +10,9 @@ inputs:
     description: 'Arcee API key for the hunt'
     required: true
   model:
-    description: 'Model to use (arcee/trinity-mini, arcee/trinity-large, etc.)'
+    description: 'Model to use (trinity-mini, trinity-large, etc.)'
     required: false
-    default: 'arcee/trinity-mini'
+    default: 'trinity-mini'
   passes:
     description: 'Which hunting passes to run (comma-separated: logic,security,performance,judge)'
     required: false

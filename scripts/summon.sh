@@ -8,7 +8,7 @@ set -euo pipefail
 
 # Configuration
 ARCEE_API_KEY="${ARCEE_API_KEY:-}"
-MODEL="${MODEL:-arcee/trinity-mini}"
+MODEL="${MODEL:-trinity-mini}"
 PASSES="${PASSES:-logic,security,judge}"
 SEVERITY_THRESHOLD="${SEVERITY_THRESHOLD:-warning}"
 MAX_FILES="${MAX_FILES:-20}"
@@ -283,7 +283,7 @@ main() {
 		if [[ "$PASSES" == *"judge"* ]] || [ -z "${DISABLE_JUDGE:-}" ]; then
 			log "⚖️ Summoning the Judge for verification..."
 
-			local judge_model="${JUDGE_MODEL:-arcee/trinity-mini}"
+			local judge_model="${JUDGE_MODEL:-trinity-mini}"
 			local verified_findings
 			verified_findings=$("$SKILLS_DIR/judge_hunt.sh" "$all_findings" "$judge_model")
 

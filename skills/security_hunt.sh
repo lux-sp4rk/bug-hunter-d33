@@ -11,7 +11,7 @@ set -euo pipefail
 
 FILE="${1:-}"
 DIFF_CONTENT="${2:-}"
-MODEL="${3:-${MODEL:-arcee/trinity-mini}}"
+MODEL="${3:-${MODEL:-trinity-mini}}"
 ARCEE_API_KEY="${ARCEE_API_KEY:-}"
 
 if [ -z "$FILE" ] || [ -z "$DIFF_CONTENT" ]; then
@@ -53,20 +53,27 @@ If no issues found, return empty array: []"
 attempt=0
 max_attempts=3
 
+# Build JSON payload using jq for proper escaping
+JSON_PAYLOAD=$(jq -n \
+	--arg model "$MODEL" \
+	--arg system "You are the Security Hunter. Find SQL injection, XSS, auth bypasses, hardcoded secrets, and all security vulnerabilities. Be thorough. When in doubt, report." \
+	--arg prompt "$FULL_PROMPT" \
+	'{
+		model: $model,
+		messages: [
+			{role: "system", content: $system},
+			{role: "user", content: $prompt}
+		],
+		temperature: 0.1,
+		max_tokens: 4000
+	}')
+
 while [ $attempt -lt $max_attempts ]; do
 	RESPONSE=$(curl -s -w "\n%{http_code}" \
 		-X POST "https://api.arcee.ai/api/v1/chat/completions" \
 		-H "Authorization: Bearer $ARCEE_API_KEY" \
 		-H "Content-Type: application/json" \
-		-d "{
-      \"model\": \"$MODEL\",
-      \"messages\": [
-        {\"role\": \"system\", \"content\": \"You are the Security Hunter. Find SQL injection, XSS, auth bypasses, hardcoded secrets, and all security vulnerabilities. Be thorough. When in doubt, report.\"},
-        {\"role\": \"user\", \"content\": $(echo "$FULL_PROMPT" | jq -Rs .)}
-      ],
-      \"temperature\": 0.1,
-      \"max_tokens\": 4000
-    }" 2>/dev/null || echo -e "\n000")
+		-d "$JSON_PAYLOAD" 2>/dev/null || echo -e "\n000")
 
 	HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 	BODY=$(echo "$RESPONSE" | sed '$d')

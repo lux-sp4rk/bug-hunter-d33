@@ -16,7 +16,7 @@ capabilities:
 
 # Runtime configuration
 runtime:
-  model: arcee/trinity-large  # Use larger model for deep hunts
+  model: trinity-large  # Use larger model for deep hunts
   temperature: 0.1
   max_tokens: 8000
   env:
@@ -56,7 +56,7 @@ integrations:
     comment-mode: inline  # Post findings as PR comments
   
   arcee:
-    model: arcee/trinity-large
+    model: trinity-large
     api_key_env: ARCEE_API_KEY
 
 # Four-pass hunting configuration with verification
@@ -66,25 +66,25 @@ passes:
     skill: skills/logic_hunt.sh
     prompt: prompts/logic-hunter.md
     priority: high
-    model: "${LOGIC_MODEL:-arcee/trinity-mini}"
-  
+    model: "${LOGIC_MODEL:-trinity-mini}"
+
   security:
     skill: skills/security_hunt.sh
     prompt: prompts/security-hunter.md
     priority: critical
-    model: "${SECURITY_MODEL:-arcee/trinity-large}"
-  
+    model: "${SECURITY_MODEL:-trinity-large}"
+
   performance:
     skill: skills/performance_hunt.sh
     prompt: prompts/performance-hunter.md
     priority: medium
-    model: "${PERFORMANCE_MODEL:-arcee/trinity-mini}"
-  
+    model: "${PERFORMANCE_MODEL:-trinity-mini}"
+
   judge:
     skill: skills/judge_hunt.sh
     prompt: prompts/judge-hunter.md
     priority: critical
-    model: "${JUDGE_MODEL:-arcee/trinity-mini}"
+    model: "${JUDGE_MODEL:-trinity-mini}"
     runs_after: [logic, security, performance]
 
 # Summoning incantation (for human reference)

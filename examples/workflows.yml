@@ -23,7 +23,7 @@ jobs:
     with:
       passes: logic,security,performance
       severity-threshold: note
-      model: arcee/trinity-large
+      model: trinity-large
 
   # Security-only focused hunt
   security-hunt:
