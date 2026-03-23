@@ -1,0 +1,269 @@
+name: 'Bug Hunter D33'
+description: 'Summon the hunter to track bugs in your code. Multi-pass code review with logic, security, and performance analysis. Now with framework-aware skills.'
+author: 'lux-sp4rk'
+branding:
+  icon: 'search'
+  color: 'purple'
+
+inputs:
+  arcee-api-key:
+    description: 'Arcee API key for the hunt'
+    required: true
+  model:
+    description: 'Model to use (trinity-mini, trinity-large, etc.)'
+    required: false
+    default: 'trinity-mini'
+  passes:
+    description: 'Which hunting passes to run (comma-separated: logic,security,performance,judge)'
+    required: false
+    default: 'logic,security,judge'
+  severity-threshold:
+    description: 'Minimum severity to report (note, warning, error)'
+    required: false
+    default: 'warning'
+  max-files:
+    description: 'Maximum files to review (0 for unlimited)'
+    required: false
+    default: '20'
+  custom-prompts-path:
+    description: 'Path to custom prompt overrides'
+    required: false
+    default: ''
+  exclude-tests:
+    description: 'Exclude test files from review (true/false)'
+    required: false
+    default: 'true'
+
+outputs:
+  status:
+    description: 'Overall hunt result: success, warning, or failure'
+  findings:
+    description: 'JSON array of all findings'
+  critical-count:
+    description: 'Number of critical issues found'
+  warning-count:
+    description: 'Number of warnings found'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Bug Hunter
+      shell: bash
+      run: |
+        # Install dependencies
+        sudo apt-get update -qq && sudo apt-get install -y -qq jq curl
+        
+        # Setup workspace
+        mkdir -p .bug-hunter
+        
+        # Copy prompts from action
+        ACTION_PATH="${{ github.action_path }}"
+        cp -r "$ACTION_PATH/prompts" .bug-hunter/ || true
+        
+        # Copy framework skills from action
+        cp -r "$ACTION_PATH/framework-skills" .bug-hunter/ || true
+        
+        # Override with custom prompts if provided
+        if [ -n "${{ inputs.custom-prompts-path }}" ] && [ -d "${{ inputs.custom-prompts-path }}" ]; then
+          cp -r "${{ inputs.custom-prompts-path }}"/* .bug-hunter/prompts/ 2>/dev/null || true
+        fi
+
+    - name: Detect Framework
+      id: framework
+      shell: bash
+      run: |
+        git fetch origin ${{ github.base_ref }}
+        git diff "origin/${{ github.base_ref }}...HEAD" > pr_diff.txt || git diff HEAD~1 > pr_diff.txt
+        
+        FRAMEWORK=""
+        FRAMEWORK_SKILL=""
+        
+        # Detect React/Next.js
+        if grep -qE "(from ['\"]react['\"]|import React)" pr_diff.txt || \
+           grep -qE '\.jsx$|\.tsx$' pr_diff.txt || \
+           grep -qE "from ['\"]next['\"]|from ['\"]next/" pr_diff.txt; then
+          FRAMEWORK="react"
+          FRAMEWORK_SKILL="react-vercel.md"
+        # Detect Vue
+        elif grep -qE "from ['\"]vue['\"]|\.vue$" pr_diff.txt; then
+          FRAMEWORK="vue"
+          FRAMEWORK_SKILL="vue.md"
+        # Detect Godot
+        elif grep -qE '\.gd$|extends Node|@onready|func _ready' pr_diff.txt; then
+          FRAMEWORK="godot"
+          FRAMEWORK_SKILL="godot-gamedev.md"
+        # Detect Supabase/Postgres
+        elif grep -qE "from ['\"]@supabase/supabase-js['\"]|supabase\\.from\\(|supabase\\.rpc\\(" pr_diff.txt || \
+             grep -qE '\.sql$|CREATE TABLE|SELECT.*FROM' pr_diff.txt; then
+          FRAMEWORK="supabase"
+          FRAMEWORK_SKILL="supabase-postgres.md"
+        fi
+        
+        echo "framework=$FRAMEWORK" >> "$GITHUB_OUTPUT"
+        echo "skill=$FRAMEWORK_SKILL" >> "$GITHUB_OUTPUT"
+        
+        if [ -n "$FRAMEWORK" ]; then
+          echo "🔍 Detected framework: $FRAMEWORK"
+          if [ -f ".bug-hunter/framework-skills/$FRAMEWORK_SKILL" ]; then
+            echo "📚 Loading skill: $FRAMEWORK_SKILL"
+          fi
+        else
+          echo "ℹ️ No framework detected - using generic review"
+        fi
+
+    - name: Run Bug Hunter
+      id: hunt
+      shell: bash
+      env:
+        ARCEE_API_KEY: ${{ inputs.arcee-api-key }}
+        MODEL: ${{ inputs.model }}
+        PASSES: ${{ inputs.passes }}
+        SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
+        MAX_FILES: ${{ inputs.max-files }}
+        EXCLUDE_TESTS: ${{ inputs.exclude-tests }}
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_REF: ${{ github.base_ref }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        ACTION_PATH: ${{ github.action_path }}
+        FRAMEWORK: ${{ steps.framework.outputs.framework }}
+        FRAMEWORK_SKILL: ${{ steps.framework.outputs.skill }}
+      run: |
+        # Export framework context for skills to use
+        if [ -n "$FRAMEWORK" ] && [ -f ".bug-hunter/framework-skills/$FRAMEWORK_SKILL" ]; then
+          export FRAMEWORK_CONTEXT=$(cat ".bug-hunter/framework-skills/$FRAMEWORK_SKILL")
+          echo "📋 Framework context loaded (${#FRAMEWORK_CONTEXT} chars)"
+        fi
+        
+        # Export security context for security hunter
+        if echo "$PASSES" | grep -q "security"; then
+          if [ -f ".bug-hunter/framework-skills/security-review.md" ]; then
+            export SECURITY_CONTEXT=$(cat ".bug-hunter/framework-skills/security-review.md")
+            echo "🔒 Security context loaded (${#SECURITY_CONTEXT} chars)"
+          fi
+        fi
+        
+        chmod +x "$ACTION_PATH/scripts/summon.sh"
+        chmod +x "$ACTION_PATH/skills/"*.sh
+        "$ACTION_PATH/scripts/summon.sh"
+
+    - name: Post Findings
+      if: always()
+      uses: actions/github-script@v7
+      env:
+        FINDINGS: ${{ steps.hunt.outputs.findings }}
+        STATUS: ${{ steps.hunt.outputs.status }}
+        FRAMEWORK: ${{ steps.framework.outputs.framework }}
+      with:
+        script: |
+          const fs = require('fs');
+          const findings = JSON.parse(process.env.FINDINGS || '[]');
+          const status = process.env.STATUS || 'failure';
+          const framework = process.env.FRAMEWORK || '';
+          
+          // Build comment
+          const icons = { critical: '🔴', warning: '🟡', note: '🟣' };
+          let body = '## 🧛‍♂️ Bug Hunter D33 Report\n\n';
+          
+          if (framework) {
+            body += `*Framework: **${framework}** | The hunt is complete.*\n\n`;
+          } else {
+            body += '*The hunt is complete.*\n\n';
+          }
+          
+          if (findings.length === 0) {
+            body += '*The night was quiet. No quarry found.*\n\n✅ **No issues detected**';
+          } else {
+            body += `*${findings.length} track${findings.length > 1 ? 's' : ''} found.*\n\n`;
+            
+            // Group by severity
+            const critical = findings.filter(f => f.severity === 'critical');
+            const warnings = findings.filter(f => f.severity === 'warning');
+            const notes = findings.filter(f => f.severity === 'note');
+            
+            if (critical.length > 0) {
+              body += `### 🔴 Critical (${critical.length})\n\n`;
+              critical.forEach(f => {
+                body += `- **${f.file}:${f.line}** — ${f.message}\n`;
+                if (f.suggestion) body += `  > ${f.suggestion}\n`;
+              });
+              body += '\n';
+            }
+            
+            if (warnings.length > 0) {
+              body += `### 🟡 Warnings (${warnings.length})\n\n`;
+              warnings.slice(0, 10).forEach(f => {
+                body += `- **${f.file}:${f.line || 'n/a'}** — ${f.message}\n`;
+              });
+              if (warnings.length > 10) body += `- *...and ${warnings.length - 10} more*\n`;
+              body += '\n';
+            }
+          }
+          
+          body += `\n---\n*Hunt completed with status: **${status}***`;
+          
+          // Post or update comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number
+          });
+          
+          const botComment = comments.find(c => c.body.includes('Bug Hunter D33'));
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }
+
+    - name: Create Check Run
+      if: always()
+      uses: actions/github-script@v7
+      env:
+        STATUS: ${{ steps.hunt.outputs.status }}
+        FRAMEWORK: ${{ steps.framework.outputs.framework }}
+      with:
+        script: |
+          const status = process.env.STATUS || 'failure';
+          const framework = process.env.FRAMEWORK || '';
+          const conclusion = status === 'success' ? 'success' :
+                            status === 'warning' ? 'neutral' : 'failure';
+          
+          const frameworkTag = framework ? ` [${framework}]` : '';
+          
+          await github.rest.checks.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            name: `🧛‍♂️ Bug Hunter D33${frameworkTag}`,
+            head_sha: context.payload.pull_request.head.sha,
+            status: 'completed',
+            conclusion: conclusion,
+            output: {
+              title: conclusion === 'success' ? 'The hunt found no quarry' :
+                     conclusion === 'neutral' ? 'Tracks found worth investigating' : 
+                     'Critical quarry must be addressed',
+              summary: `Bug Hunter D33${frameworkTag} completed with status: ${status}`
+            }
+          });
+
+    - name: Fail on Critical
+      if: steps.hunt.outputs.status == 'failure'
+      shell: bash
+      run: |
+        echo "🔴 Critical issues found. The hunt demands resolution."
+        exit 1

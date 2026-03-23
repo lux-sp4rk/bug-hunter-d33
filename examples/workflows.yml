@@ -1,0 +1,35 @@
+# Example Workflows
+
+name: Bug Hunter D33 Example
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  # Basic hunt - logic and security only
+  basic-hunt:
+    uses: lux-sp4rk/bug-hunter-d33/.github/workflows/hunt.yml@main
+    secrets:
+      arcee-api-key: ${{ secrets.ARCEE_API_KEY }}
+    with:
+      passes: logic,security
+
+  # Deep hunt - all passes with stricter thresholds
+  deep-hunt:
+    uses: lux-sp4rk/bug-hunter-d33/.github/workflows/hunt.yml@main
+    secrets:
+      arcee-api-key: ${{ secrets.ARCEE_API_KEY }}
+    with:
+      passes: logic,security,performance
+      severity-threshold: note
+      model: trinity-large
+
+  # Security-only focused hunt
+  security-hunt:
+    uses: lux-sp4rk/bug-hunter-d33/.github/workflows/hunt.yml@main
+    secrets:
+      arcee-api-key: ${{ secrets.ARCEE_API_KEY }}
+    with:
+      passes: security
+      severity-threshold: note

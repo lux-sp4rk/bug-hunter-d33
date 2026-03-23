@@ -1,0 +1,94 @@
+# OpenClaw Subagent Configuration
+# Bug Hunter D33 — Runtime Agent Mode
+
+name: bug-hunter-d33
+description: Summon the Bug Hunter for deep code analysis tasks
+
+# Agent identity from SOUL.md
+soul: SOUL.md
+
+# Capabilities
+capabilities:
+  - code-review
+  - bug-detection
+  - security-audit
+  - performance-analysis
+
+# Runtime configuration
+runtime:
+  model: trinity-large  # Use larger model for deep hunts
+  temperature: 0.1
+  max_tokens: 8000
+  env:
+    EXCLUDE_TESTS: "true"  # Exclude test files by default
+
+# Task routing
+tasks:
+  review-pr:
+    description: Review a pull request
+    prompt: |
+      Review PR #{pr_number} in {repo} for logic errors, security issues, and performance problems.
+      Use the three-pass hunting method.
+    outputs:
+      - findings.json
+      - summary.md
+  
+  hunt-file:
+    description: Deep analysis of a specific file
+    prompt: |
+      Perform a thorough bug hunt on {file_path}.
+      Focus on: {focus_areas}
+    outputs:
+      - findings.json
+  
+  security-audit:
+    description: Security-focused review
+    prompt: |
+      Perform security audit on {target}.
+      Report all vulnerabilities with severity and remediation.
+    outputs:
+      - security-report.md
+
+# Integration
+integrations:
+  github:
+    enabled: true
+    comment-mode: inline  # Post findings as PR comments
+  
+  arcee:
+    model: trinity-large
+    api_key_env: ARCEE_API_KEY
+
+# Four-pass hunting configuration with verification
+# Each pass is implemented as a modular skill in skills/
+passes:
+  logic:
+    skill: skills/logic_hunt.sh
+    prompt: prompts/logic-hunter.md
+    priority: high
+    model: "${LOGIC_MODEL:-trinity-mini}"
+
+  security:
+    skill: skills/security_hunt.sh
+    prompt: prompts/security-hunter.md
+    priority: critical
+    model: "${SECURITY_MODEL:-trinity-large}"
+
+  performance:
+    skill: skills/performance_hunt.sh
+    prompt: prompts/performance-hunter.md
+    priority: medium
+    model: "${PERFORMANCE_MODEL:-trinity-mini}"
+
+  judge:
+    skill: skills/judge_hunt.sh
+    prompt: prompts/judge-hunter.md
+    priority: critical
+    model: "${JUDGE_MODEL:-trinity-mini}"
+    runs_after: [logic, security, performance]
+
+# Summoning incantation (for human reference)
+summoning: |
+  🧛‍♂️ Bug Hunter D33, awaken.
+  The code has changed. Shadows gather.
+  Find that which hides in the diff.
