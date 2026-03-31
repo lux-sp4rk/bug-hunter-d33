@@ -165,26 +165,38 @@ runs:
           const status = process.env.STATUS || 'failure';
           const framework = process.env.FRAMEWORK || '';
           
-          // Build comment
           const icons = { critical: '🔴', warning: '🟡', note: '🟣' };
-          let body = '## 🧛‍♂️ Bug Hunter D33 Report\n\n';
-          
+          const critical = findings.filter(f => f.severity === 'critical');
+          const warnings = findings.filter(f => f.severity === 'warning');
+          const notes = findings.filter(f => f.severity === 'note');
+
+          // ── Character narration ──────────────────────────────────────
+          let narration = '';
+          if (findings.length === 0) {
+            if (framework) {
+              narration = `*🌙 The night is silent. No tracks on ${framework} soil — the territory is clean. TertiaryDetection confirms nothing amiss.*`;
+            } else {
+              narration = `*🌙 The night is silent. No quarry. No tracks. The territory is clear.*`;
+            }
+          } else {
+            if (critical.length > 0) {
+              narration = `*🩸 Critical quarry confirmed — ${critical.length} bloodtrail${critical.length > 1 ? 's' : ''}. The hunt demands immediate action. ${warnings.length > 0 ? `${warnings.length} more tracks spotted nearby.` : ''}*`;
+            } else if (warnings.length > 0) {
+              narration = `*🐾 ${warnings.length} track${warnings.length > 1 ? 's' : ''} found. The quarry has been here recently. Worth investigating before nightfall.*`;
+            } else {
+              narration = `*🟡 Minor traces detected — nothing urgent, but the hunt leaves no stone unturned.*`;
+            }
+          }
+
+          let body = `## 🧛‍♂️ Bug Hunter D33 Report\n\n${narration}\n\n`;
+
           if (framework) {
             body += `*Framework: **${framework}** | The hunt is complete.*\n\n`;
-          } else {
-            body += '*The hunt is complete.*\n\n';
           }
-          
+
           if (findings.length === 0) {
-            body += '*The night was quiet. No quarry found.*\n\n✅ **No issues detected**';
+            body += `✅ **No issues detected**`;
           } else {
-            body += `*${findings.length} track${findings.length > 1 ? 's' : ''} found.*\n\n`;
-            
-            // Group by severity
-            const critical = findings.filter(f => f.severity === 'critical');
-            const warnings = findings.filter(f => f.severity === 'warning');
-            const notes = findings.filter(f => f.severity === 'note');
-            
             if (critical.length > 0) {
               body += `### 🔴 Critical (${critical.length})\n\n`;
               critical.forEach(f => {
@@ -204,7 +216,7 @@ runs:
             }
           }
           
-          body += `\n---\n*Hunt completed with status: **${status}***`;
+          body += `\n---\n*The hunter rests. Status: **${status}***`;
           
           // Post or update comment
           const { data: comments } = await github.rest.issues.listComments({
