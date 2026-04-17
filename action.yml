@@ -29,6 +29,10 @@ inputs:
     description: 'Path to custom prompt overrides'
     required: false
     default: ''
+  framework:
+    description: 'Explicit framework override (godot, react, vue, supabase). If not set, auto-detects from PR diff then repo root.'
+    required: false
+    default: ''
   exclude-tests:
     description: 'Exclude test files from review (true/false)'
     required: false
@@ -76,41 +80,59 @@ runs:
       id: framework
       shell: bash
       run: |
+        # 1. Explicit override takes priority
+        if [ -n "${{ inputs.framework }}" ]; then
+          FRAMEWORK="${{ inputs.framework }}"
+          case "$FRAMEWORK" in
+            godot)   FRAMEWORK_SKILL="godot-gamedev.md" ;;
+            react)   FRAMEWORK_SKILL="react-vercel.md"  ;;
+            vue)     FRAMEWORK_SKILL="vue.md"            ;;
+            supabase) FRAMEWORK_SKILL="supabase-postgres.md" ;;
+          esac
+          echo "framework=$FRAMEWORK" >> "$GITHUB_OUTPUT"
+          echo "skill=$FRAMEWORK_SKILL" >> "$GITHUB_OUTPUT"
+          echo "🔧 Framework forced via input: $FRAMEWORK"
+          exit 0
+        fi
+
+        # 2. Detect from PR diff
         git fetch origin ${{ github.base_ref }}
-        git diff "origin/${{ github.base_ref }}...HEAD" > pr_diff.txt || git diff HEAD~1 > pr_diff.txt
-        
+        git diff "origin/${{ github.base_ref }}...HEAD" > pr_diff.txt 2>/dev/null || git diff HEAD~1 > pr_diff.txt
+
         FRAMEWORK=""
         FRAMEWORK_SKILL=""
-        
-        # Detect React/Next.js
+
         if grep -qE "(from ['\"]react['\"]|import React)" pr_diff.txt || \
            grep -qE '\.jsx$|\.tsx$' pr_diff.txt || \
            grep -qE "from ['\"]next['\"]|from ['\"]next/" pr_diff.txt; then
-          FRAMEWORK="react"
-          FRAMEWORK_SKILL="react-vercel.md"
-        # Detect Vue
+          FRAMEWORK="react";      FRAMEWORK_SKILL="react-vercel.md"
         elif grep -qE "from ['\"]vue['\"]|\.vue$" pr_diff.txt; then
-          FRAMEWORK="vue"
-          FRAMEWORK_SKILL="vue.md"
-        # Detect Godot
+          FRAMEWORK="vue";        FRAMEWORK_SKILL="vue.md"
         elif grep -qE '\.gd$|extends Node|@onready|func _ready' pr_diff.txt; then
-          FRAMEWORK="godot"
-          FRAMEWORK_SKILL="godot-gamedev.md"
-        # Detect Supabase/Postgres
+          FRAMEWORK="godot";      FRAMEWORK_SKILL="godot-gamedev.md"
         elif grep -qE "from ['\"]@supabase/supabase-js['\"]|supabase\\.from\\(|supabase\\.rpc\\(" pr_diff.txt || \
-             grep -qE '\.sql$|CREATE TABLE|SELECT.*FROM' pr_diff.txt; then
-          FRAMEWORK="supabase"
-          FRAMEWORK_SKILL="supabase-postgres.md"
+              grep -qE '\.sql$|CREATE TABLE|SELECT.*FROM' pr_diff.txt; then
+          FRAMEWORK="supabase";  FRAMEWORK_SKILL="supabase-postgres.md"
         fi
-        
+
+        # 3. Repo-root scan if PR diff gave nothing
+        if [ -z "$FRAMEWORK" ]; then
+          if [ -f "project.godot" ] || [ -d "godot" ]; then
+            FRAMEWORK="godot";      FRAMEWORK_SKILL="godot-gamedev.md"
+          elif [ -f "package.json" ] && grep -q '"next"\|"react"' package.json; then
+            FRAMEWORK="react";      FRAMEWORK_SKILL="react-vercel.md"
+          elif [ -f "package.json" ] && grep -q '"vue"' package.json; then
+            FRAMEWORK="vue";       FRAMEWORK_SKILL="vue.md"
+          elif [ -f "supabase" ] || grep -qE 'supabase\\.from\\(|@supabase/supabase-js' */**/*.sql 2>/dev/null; then
+            FRAMEWORK="supabase";  FRAMEWORK_SKILL="supabase-postgres.md"
+          fi
+        fi
+
         echo "framework=$FRAMEWORK" >> "$GITHUB_OUTPUT"
         echo "skill=$FRAMEWORK_SKILL" >> "$GITHUB_OUTPUT"
-        
+
         if [ -n "$FRAMEWORK" ]; then
           echo "🔍 Detected framework: $FRAMEWORK"
-          if [ -f ".bug-hunter/framework-skills/$FRAMEWORK_SKILL" ]; then
-            echo "📚 Loading skill: $FRAMEWORK_SKILL"
-          fi
         else
           echo "ℹ️ No framework detected - using generic review"
         fi
